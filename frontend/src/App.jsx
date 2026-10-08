@@ -14,18 +14,23 @@ function App() {
   });
 
   const [receipt, setReceipt] = useState(null);
+  const [riskResult, setRiskResult] = useState(null);
   const [anchorResult, setAnchorResult] = useState(null);
   const [verifyResult, setVerifyResult] = useState(null);
   const [tamperResult, setTamperResult] = useState(null);
 
   const [error, setError] = useState("");
+  const [riskError, setRiskError] = useState("");
+
   const [loading, setLoading] = useState(false);
+  const [riskLoading, setRiskLoading] = useState(false);
   const [anchorLoading, setAnchorLoading] = useState(false);
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [tamperLoading, setTamperLoading] = useState(false);
 
   const [workflow, setWorkflow] = useState({
     create: true,
+    risk: false,
     sign: false,
     accept: false,
     receipt: false,
@@ -42,18 +47,74 @@ function App() {
     }));
   };
 
+  const assessRisk = async () => {
+    setRiskLoading(true);
+    setRiskError("");
+
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8000/handoffs/risk",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(formData),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || `Risk assessment returned ${response.status}`
+        );
+      }
+
+      if (!data.success) {
+        throw new Error(
+          data.message || "Unable to assess handoff risk"
+        );
+      }
+
+      setRiskResult(data);
+
+      setWorkflow((previous) => ({
+        ...previous,
+        risk: true,
+      }));
+
+      return data;
+    } catch (err) {
+      console.error(err);
+
+      setRiskError(
+        err.message ||
+          "Unable to assess handoff risk. Make sure the FastAPI backend is running."
+      );
+
+      return null;
+    } finally {
+      setRiskLoading(false);
+    }
+  };
+
   const createHandoff = async (event) => {
     event.preventDefault();
 
     setLoading(true);
     setError("");
+    setRiskError("");
+
     setReceipt(null);
+    setRiskResult(null);
     setAnchorResult(null);
     setVerifyResult(null);
     setTamperResult(null);
 
     setWorkflow({
       create: true,
+      risk: false,
       sign: false,
       accept: false,
       receipt: false,
@@ -78,14 +139,14 @@ function App() {
 
       setReceipt(data);
 
-      setWorkflow({
+      setWorkflow((previous) => ({
+        ...previous,
         create: true,
-        sign: false,
-        accept: false,
         receipt: true,
-        anchor: false,
-        verify: false,
-      });
+      }));
+
+      // Run ML risk assessment using the same handoff data.
+      await assessRisk();
     } catch (err) {
       console.error(err);
 
@@ -269,32 +330,38 @@ function App() {
       description: "Create handoff",
     },
     {
-      key: "sign",
+      key: "risk",
       number: "02",
+      label: "RISK",
+      description: "ML assessment",
+    },
+    {
+      key: "sign",
+      number: "03",
       label: "SIGN",
       description: "Outgoing analyst",
     },
     {
       key: "accept",
-      number: "03",
+      number: "04",
       label: "ACCEPT",
       description: "Incoming analyst",
     },
     {
       key: "receipt",
-      number: "04",
+      number: "05",
       label: "RECEIPT",
       description: "SHA-256 proof",
     },
     {
       key: "anchor",
-      number: "05",
+      number: "06",
       label: "ANCHOR",
       description: "Blockchain",
     },
     {
       key: "verify",
-      number: "06",
+      number: "07",
       label: "VERIFY",
       description: "Integrity check",
     },
@@ -476,7 +543,9 @@ function App() {
                 className="primary-button"
                 disabled={loading}
               >
-                {loading ? "CREATING HANDOFF..." : "CREATE HANDOFF"}
+                {loading
+                  ? "CREATING HANDOFF..."
+                  : "CREATE HANDOFF"}
               </button>
             </form>
 
@@ -490,7 +559,9 @@ function App() {
                   onClick={handleSign}
                   disabled={workflow.sign}
                 >
-                  {workflow.sign ? "✓ HANDOFF SIGNED" : "SIGN HANDOFF"}
+                  {workflow.sign
+                    ? "✓ HANDOFF SIGNED"
+                    : "SIGN HANDOFF"}
                 </button>
 
                 <button
@@ -501,7 +572,9 @@ function App() {
                   onClick={handleAccept}
                   disabled={!workflow.sign || workflow.accept}
                 >
-                  {workflow.accept ? "✓ HANDOFF ACCEPTED" : "ACCEPT HANDOFF"}
+                  {workflow.accept
+                    ? "✓ HANDOFF ACCEPTED"
+                    : "ACCEPT HANDOFF"}
                 </button>
 
                 <button
@@ -511,7 +584,9 @@ function App() {
                   }`}
                   onClick={handleAnchor}
                   disabled={
-                    !workflow.accept || anchorLoading || workflow.anchor
+                    !workflow.accept ||
+                    anchorLoading ||
+                    workflow.anchor
                   }
                 >
                   {anchorLoading
@@ -559,7 +634,9 @@ function App() {
               </div>
             )}
 
-            {error && <div className="error-message">{error}</div>}
+            {error && (
+              <div className="error-message">{error}</div>
+            )}
           </div>
 
           <aside className="receipt-card">
@@ -593,11 +670,13 @@ function App() {
               <div className="receipt-empty">
                 <div className="empty-icon">⌑</div>
 
-                <div className="empty-title">Awaiting Handoff</div>
+                <div className="empty-title">
+                  Awaiting Handoff
+                </div>
 
                 <div className="empty-text">
-                  Submit an incident handoff to generate its cryptographic
-                  receipt.
+                  Submit an incident handoff to generate its
+                  cryptographic receipt.
                 </div>
               </div>
             ) : (
@@ -609,13 +688,120 @@ function App() {
 
                 <div className="receipt-row">
                   <span>Incident</span>
-                  <strong>{receipt.handoff.incident_id}</strong>
+                  <strong>
+                    {receipt.handoff.incident_id}
+                  </strong>
                 </div>
 
                 <div className="receipt-row">
                   <span>Created At</span>
                   <strong>{receipt.created_at}</strong>
                 </div>
+
+                {/* ML RISK ASSESSMENT */}
+                {riskResult && (
+                  <div className="risk-card">
+                    <div className="risk-header">
+                      <div>
+                        <div className="risk-title">
+                          ML Handoff Risk Assessment
+                        </div>
+
+                        <div className="risk-subtitle">
+                          Random Forest prioritization
+                        </div>
+                      </div>
+
+                      <div
+                        className={`risk-level risk-${riskResult.risk.risk_level.toLowerCase()}`}
+                      >
+                        {riskResult.risk.risk_level}
+                      </div>
+                    </div>
+
+                    <div className="risk-score-row">
+                      <div className="risk-score">
+                        {riskResult.risk.risk_score}
+                      </div>
+
+                      <div className="risk-score-label">
+                        <span>RISK SCORE</span>
+                        <strong>/ 100</strong>
+                      </div>
+                    </div>
+
+                    <div className="risk-meter">
+                      <div
+                        className="risk-meter-fill"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.max(
+                              0,
+                              riskResult.risk.risk_score
+                            )
+                          )}%`,
+                        }}
+                      ></div>
+                    </div>
+
+                    <div className="risk-reasons">
+                      <div className="risk-reasons-title">
+                        Assessment Factors
+                      </div>
+
+                      {riskResult.risk.reasons.map(
+                        (reason, index) => (
+                          <div
+                            className="risk-reason"
+                            key={index}
+                          >
+                            <span>•</span>
+                            <span>{reason}</span>
+                          </div>
+                        )
+                      )}
+                    </div>
+
+                    <div className="risk-model">
+                      Model:{" "}
+                      <strong>
+                        {riskResult.risk.model}
+                      </strong>
+                    </div>
+                  </div>
+                )}
+
+                {riskError && (
+                  <div className="risk-error">
+                    <strong>Risk assessment unavailable</strong>
+                    <p>{riskError}</p>
+
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={assessRisk}
+                      disabled={riskLoading}
+                    >
+                      {riskLoading
+                        ? "ASSESSING..."
+                        : "RETRY RISK ASSESSMENT"}
+                    </button>
+                  </div>
+                )}
+
+                {riskLoading && !riskResult && (
+                  <div className="risk-loading">
+                    <div className="risk-loading-title">
+                      ML Risk Assessment
+                    </div>
+
+                    <div>
+                      Random Forest is evaluating the
+                      handoff...
+                    </div>
+                  </div>
+                )}
 
                 <div className="hash-section">
                   <div className="hash-label">
@@ -627,7 +813,8 @@ function App() {
                   </div>
 
                   <div className="hash-explanation">
-                    Cryptographic fingerprint of the complete handoff state.
+                    Cryptographic fingerprint of the complete
+                    handoff state.
                   </div>
                 </div>
 
@@ -635,11 +822,14 @@ function App() {
                   <div className="storage-icon">●</div>
 
                   <div>
-                    <strong>Incident data stored OFF-CHAIN</strong>
+                    <strong>
+                      Incident data stored OFF-CHAIN
+                    </strong>
 
                     <p>
-                      Sensitive SOC handoff data remains in the application
-                      database. Only its cryptographic proof is anchored on
+                      Sensitive SOC handoff data remains in the
+                      application database. Only its
+                      cryptographic proof is anchored on
                       blockchain.
                     </p>
                   </div>
@@ -653,7 +843,8 @@ function App() {
                       <strong>Handoff signed</strong>
 
                       <p>
-                        The outgoing analyst has signed the current handoff.
+                        The outgoing analyst has completed the
+                        signing stage.
                       </p>
                     </div>
                   </div>
@@ -667,7 +858,8 @@ function App() {
                       <strong>Handoff accepted</strong>
 
                       <p>
-                        The incoming analyst has accepted the handoff.
+                        The incoming analyst has accepted the
+                        handoff.
                       </p>
                     </div>
                   </div>
@@ -679,11 +871,13 @@ function App() {
                       <div className="storage-icon">⛓</div>
 
                       <div>
-                        <strong>Blockchain Proof Anchored</strong>
+                        <strong>
+                          Blockchain Proof Anchored
+                        </strong>
 
                         <p>
-                          The SHA-256 receipt has been recorded on the
-                          blockchain.
+                          The SHA-256 receipt has been recorded
+                          on the blockchain.
                         </p>
                       </div>
                     </div>
@@ -691,33 +885,45 @@ function App() {
                     <div className="proof-grid">
                       <div className="proof-item">
                         <span>BLOCK NUMBER</span>
-                        <strong>#{anchorResult.block_number}</strong>
+                        <strong>
+                          #{anchorResult.block_number}
+                        </strong>
                       </div>
 
                       <div className="proof-item">
                         <span>HANDOFF ID</span>
-                        <strong>#{anchorResult.handoff_id}</strong>
+                        <strong>
+                          #{anchorResult.handoff_id}
+                        </strong>
                       </div>
                     </div>
 
                     <div className="proof-field">
                       <span>BLOCKCHAIN HASH</span>
-                      <code>{anchorResult.blockchain_hash}</code>
+                      <code>
+                        {anchorResult.blockchain_hash}
+                      </code>
                     </div>
 
                     <div className="proof-field">
                       <span>TRANSACTION HASH</span>
-                      <code>{anchorResult.transaction_hash}</code>
+                      <code>
+                        {anchorResult.transaction_hash}
+                      </code>
                     </div>
 
                     <div className="proof-field">
                       <span>CONTRACT ADDRESS</span>
-                      <code>{anchorResult.contract_address}</code>
+                      <code>
+                        {anchorResult.contract_address}
+                      </code>
                     </div>
 
                     <div className="proof-field">
                       <span>ANCHORED AT</span>
-                      <code>{anchorResult.anchored_at}</code>
+                      <code>
+                        {anchorResult.anchored_at}
+                      </code>
                     </div>
                   </div>
                 )}
@@ -731,8 +937,14 @@ function App() {
 
                       <p>
                         Severity changed from{" "}
-                        <strong>{tamperResult.original_value}</strong> to{" "}
-                        <strong>{tamperResult.tampered_value}</strong>.
+                        <strong>
+                          {tamperResult.original_value}
+                        </strong>{" "}
+                        to{" "}
+                        <strong>
+                          {tamperResult.tampered_value}
+                        </strong>
+                        .
                       </p>
 
                       <p>
@@ -755,33 +967,46 @@ function App() {
                     </div>
 
                     <div>
-                      <strong>{verifyResult.status}</strong>
+                      <strong>
+                        {verifyResult.status}
+                      </strong>
 
                       <p>
-                        The current handoff hash was recalculated and
-                        compared with the blockchain-anchored hash.
+                        The current handoff hash was
+                        recalculated and compared with the
+                        blockchain-anchored hash.
                       </p>
 
                       <div className="verification-comparison">
                         <div>
                           <span>CURRENT HASH</span>
-                          <code>{verifyResult.current_hash}</code>
+                          <code>
+                            {verifyResult.current_hash}
+                          </code>
                         </div>
 
                         <div>
                           <span>BLOCKCHAIN HASH</span>
-                          <code>{verifyResult.blockchain_hash}</code>
+                          <code>
+                            {verifyResult.blockchain_hash}
+                          </code>
                         </div>
                       </div>
 
                       <div className="verification-source">
                         Blockchain transaction:{" "}
-                        <code>{verifyResult.blockchain_transaction}</code>
+                        <code>
+                          {
+                            verifyResult.blockchain_transaction
+                          }
+                        </code>
                       </div>
 
                       <div className="verification-source">
                         Blockchain block:{" "}
-                        <strong>#{verifyResult.block_number}</strong>
+                        <strong>
+                          #{verifyResult.block_number}
+                        </strong>
                       </div>
                     </div>
                   </div>
