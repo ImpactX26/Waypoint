@@ -21,10 +21,6 @@ app = FastAPI(
 )
 
 
-# ---------------------------------------------------------
-# CORS
-# ---------------------------------------------------------
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -36,10 +32,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# ---------------------------------------------------------
-# DATABASE
-# ---------------------------------------------------------
 
 DATABASE_URL = "sqlite:///./handoffchain.db"
 
@@ -83,10 +75,6 @@ class HandoffRecord(Base):
 Base.metadata.create_all(bind=engine)
 
 
-# ---------------------------------------------------------
-# BLOCKCHAIN CONFIGURATION
-# ---------------------------------------------------------
-
 BLOCKCHAIN_RPC_URL = "http://127.0.0.1:8545"
 
 CONTRACT_ADDRESS = Web3.to_checksum_address(
@@ -100,16 +88,14 @@ ABI_PATH = os.path.join(
 )
 
 
-# Hardhat's first local test account.
-# This account exists only on the local development blockchain.
+# Hardhat Account #0.
+# This key is for the local Hardhat development blockchain only.
 HARDHAT_PRIVATE_KEY = (
-    "0x59c6995e998f97a5a0044976f0945389dc9e86dae88a8f5d"
-    "f3c7b8f5f7a8c5f3"
+    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 )
 
 
 def load_contract_abi():
-
     with open(ABI_PATH, "r", encoding="utf-8") as file:
         artifact = json.load(file)
 
@@ -117,7 +103,6 @@ def load_contract_abi():
 
 
 def get_web3():
-
     web3 = Web3(
         Web3.HTTPProvider(BLOCKCHAIN_RPC_URL)
     )
@@ -132,16 +117,11 @@ def get_web3():
 
 
 def get_contract(web3):
-
     return web3.eth.contract(
         address=CONTRACT_ADDRESS,
         abi=load_contract_abi()
     )
 
-
-# ---------------------------------------------------------
-# REQUEST MODEL
-# ---------------------------------------------------------
 
 class Handoff(BaseModel):
     incident_id: str
@@ -154,12 +134,7 @@ class Handoff(BaseModel):
     pending_actions: str
 
 
-# ---------------------------------------------------------
-# SHA-256 RECEIPT
-# ---------------------------------------------------------
-
-def generate_receipt_hash(handoff: Handoff):
-
+def generate_receipt_hash(handoff):
     handoff_data = {
         "incident_id": handoff.incident_id,
         "severity": handoff.severity,
@@ -184,13 +159,39 @@ def generate_receipt_hash(handoff: Handoff):
     return receipt_hash
 
 
-# ---------------------------------------------------------
-# HOME
-# ---------------------------------------------------------
+def generate_hash_from_record(record):
+    """
+    Recalculate the SHA-256 hash from the CURRENT database fields.
+
+    This is important for tamper detection:
+    if any handoff field changes after anchoring,
+    this calculated hash will also change.
+    """
+
+    handoff_data = {
+        "incident_id": record.incident_id,
+        "severity": record.severity,
+        "alert": record.alert,
+        "host": record.host,
+        "status": record.status,
+        "findings": record.findings,
+        "assessment": record.assessment,
+        "pending_actions": record.pending_actions,
+    }
+
+    canonical_data = json.dumps(
+        handoff_data,
+        sort_keys=True,
+        separators=(",", ":")
+    )
+
+    return hashlib.sha256(
+        canonical_data.encode("utf-8")
+    ).hexdigest()
+
 
 @app.get("/")
 def home():
-
     return {
         "project": "HandoffChain",
         "status": "running",
@@ -198,13 +199,8 @@ def home():
     }
 
 
-# ---------------------------------------------------------
-# CREATE HANDOFF
-# ---------------------------------------------------------
-
 @app.post("/handoffs")
 def create_handoff(handoff: Handoff):
-
     receipt_hash = generate_receipt_hash(handoff)
 
     created_at = datetime.utcnow().isoformat() + "Z"
@@ -212,7 +208,6 @@ def create_handoff(handoff: Handoff):
     db = SessionLocal()
 
     try:
-
         record = HandoffRecord(
             incident_id=handoff.incident_id,
             severity=handoff.severity,
@@ -230,9 +225,7 @@ def create_handoff(handoff: Handoff):
         )
 
         db.add(record)
-
         db.commit()
-
         db.refresh(record)
 
         return {
@@ -247,30 +240,22 @@ def create_handoff(handoff: Handoff):
         db.close()
 
 
-# ---------------------------------------------------------
-# ANCHOR HANDOFF HASH ON BLOCKCHAIN
-# ---------------------------------------------------------
-
 @app.post("/handoffs/{handoff_id}/anchor")
 def anchor_handoff(handoff_id: int):
-
     db = SessionLocal()
 
     try:
-
         record = db.query(HandoffRecord).filter(
             HandoffRecord.id == handoff_id
         ).first()
 
         if record is None:
-
             return {
                 "success": False,
                 "message": "Handoff not found"
             }
 
         if record.blockchain_tx:
-
             return {
                 "success": False,
                 "message": "Handoff already anchored",
@@ -279,7 +264,6 @@ def anchor_handoff(handoff_id: int):
             }
 
         web3 = get_web3()
-
         contract = get_contract(web3)
 
         account = Account.from_key(
@@ -338,41 +322,31 @@ def anchor_handoff(handoff_id: int):
         }
 
     finally:
-
         db.close()
 
 
-# ---------------------------------------------------------
-# VERIFY HANDOFF INTEGRITY
-# ---------------------------------------------------------
-
 @app.get("/handoffs/{handoff_id}/verify")
 def verify_handoff(handoff_id: int):
-
     db = SessionLocal()
 
     try:
-
         record = db.query(HandoffRecord).filter(
             HandoffRecord.id == handoff_id
         ).first()
 
         if record is None:
-
             return {
                 "success": False,
                 "message": "Handoff not found"
             }
 
         if not record.blockchain_tx:
-
             return {
                 "success": False,
                 "message": "Handoff has not been anchored on blockchain"
             }
 
         web3 = get_web3()
-
         contract = get_contract(web3)
 
         blockchain_data = contract.functions.getHandoff(
@@ -386,17 +360,20 @@ def verify_handoff(handoff_id: int):
         if blockchain_hash.startswith("0x"):
             blockchain_hash = blockchain_hash[2:]
 
-        local_hash = record.receipt_hash
+        # IMPORTANT:
+        # Recalculate the hash from the CURRENT handoff fields.
+        current_hash = generate_hash_from_record(record)
 
         verified = (
-            local_hash.lower()
+            current_hash.lower()
             == blockchain_hash.lower()
         )
 
         return {
             "success": True,
             "handoff_id": handoff_id,
-            "stored_hash": local_hash,
+            "stored_hash": record.receipt_hash,
+            "current_hash": current_hash,
             "blockchain_hash": blockchain_hash,
             "verified": verified,
             "status": (
@@ -409,5 +386,65 @@ def verify_handoff(handoff_id: int):
         }
 
     finally:
+        db.close()
 
+
+@app.post("/handoffs/{handoff_id}/tamper")
+def simulate_tamper(handoff_id: int):
+    """
+    DEMO-ONLY endpoint.
+
+    Simulates an attacker changing an already recorded
+    handoff field after the blockchain proof was created.
+
+    The blockchain hash is NOT changed.
+    The database incident data is changed.
+    Verification should therefore fail.
+    """
+
+    db = SessionLocal()
+
+    try:
+        record = db.query(HandoffRecord).filter(
+            HandoffRecord.id == handoff_id
+        ).first()
+
+        if record is None:
+            return {
+                "success": False,
+                "message": "Handoff not found"
+            }
+
+        if not record.blockchain_tx:
+            return {
+                "success": False,
+                "message": "Handoff must be anchored before tampering"
+            }
+
+        original_severity = record.severity
+
+        # DEMO TAMPER:
+        # Change HIGH to LOW, or any other severity to LOW.
+        if record.severity == "LOW":
+            record.severity = "HIGH"
+        else:
+            record.severity = "LOW"
+
+        db.commit()
+        db.refresh(record)
+
+        return {
+            "success": True,
+            "message": "Demo tamper applied",
+            "handoff_id": handoff_id,
+            "changed_field": "severity",
+            "original_value": original_severity,
+            "tampered_value": record.severity,
+            "warning": (
+                "The blockchain proof was not changed. "
+                "Verification should now fail."
+            )
+        }
+
+    finally:
         db.close()

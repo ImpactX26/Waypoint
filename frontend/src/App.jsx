@@ -14,8 +14,15 @@ function App() {
   });
 
   const [receipt, setReceipt] = useState(null);
+  const [anchorResult, setAnchorResult] = useState(null);
+  const [verifyResult, setVerifyResult] = useState(null);
+  const [tamperResult, setTamperResult] = useState(null);
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [anchorLoading, setAnchorLoading] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [tamperLoading, setTamperLoading] = useState(false);
 
   const [workflow, setWorkflow] = useState({
     create: true,
@@ -41,6 +48,18 @@ function App() {
     setLoading(true);
     setError("");
     setReceipt(null);
+    setAnchorResult(null);
+    setVerifyResult(null);
+    setTamperResult(null);
+
+    setWorkflow({
+      create: true,
+      sign: false,
+      accept: false,
+      receipt: false,
+      anchor: false,
+      verify: false,
+    });
 
     try {
       const response = await fetch("http://127.0.0.1:8000/handoffs", {
@@ -100,6 +119,148 @@ function App() {
     }));
   };
 
+  const handleAnchor = async () => {
+    if (!receipt || !workflow.accept) {
+      return;
+    }
+
+    setAnchorLoading(true);
+    setError("");
+    setAnchorResult(null);
+    setVerifyResult(null);
+    setTamperResult(null);
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/handoffs/${receipt.handoff_id}/anchor`,
+        {
+          method: "POST",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || `Backend returned ${response.status}`
+        );
+      }
+
+      if (!data.success) {
+        throw new Error(data.message || "Unable to anchor handoff");
+      }
+
+      setAnchorResult(data);
+
+      setWorkflow((previous) => ({
+        ...previous,
+        anchor: true,
+        verify: false,
+      }));
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err.message ||
+          "Unable to anchor handoff. Make sure Hardhat and the FastAPI backend are running."
+      );
+    } finally {
+      setAnchorLoading(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!receipt || !workflow.anchor) {
+      return;
+    }
+
+    setVerifyLoading(true);
+    setError("");
+    setVerifyResult(null);
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/handoffs/${receipt.handoff_id}/verify`
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || `Backend returned ${response.status}`
+        );
+      }
+
+      if (!data.success) {
+        throw new Error(data.message || "Unable to verify handoff");
+      }
+
+      setVerifyResult(data);
+
+      setWorkflow((previous) => ({
+        ...previous,
+        verify: data.verified,
+      }));
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err.message ||
+          "Unable to verify handoff. Make sure Hardhat and the FastAPI backend are running."
+      );
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
+
+  const handleTamper = async () => {
+    if (!receipt || !workflow.anchor) {
+      return;
+    }
+
+    setTamperLoading(true);
+    setError("");
+    setTamperResult(null);
+    setVerifyResult(null);
+
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/handoffs/${receipt.handoff_id}/tamper`,
+        {
+          method: "POST",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || `Backend returned ${response.status}`
+        );
+      }
+
+      if (!data.success) {
+        throw new Error(data.message || "Unable to simulate tamper");
+      }
+
+      setTamperResult(data);
+
+      setWorkflow((previous) => ({
+        ...previous,
+        verify: false,
+      }));
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err.message ||
+          "Unable to simulate tamper. Make sure the FastAPI backend is running."
+      );
+    } finally {
+      setTamperLoading(false);
+    }
+  };
+
   const workflowItems = [
     {
       key: "create",
@@ -144,6 +305,7 @@ function App() {
       <header className="header">
         <div>
           <div className="brand">HandoffChain</div>
+
           <div className="subtitle">
             Tamper-Evident SOC Shift Handoff System
           </div>
@@ -171,6 +333,7 @@ function App() {
 
                   <div>
                     <div className="workflow-label">{item.label}</div>
+
                     <div className="workflow-description">
                       {item.description}
                     </div>
@@ -190,6 +353,7 @@ function App() {
             <div className="card-header">
               <div>
                 <div className="card-title">Create SOC Handoff</div>
+
                 <div className="card-description">
                   Record the current SOC incident state for the incoming
                   analyst.
@@ -339,6 +503,59 @@ function App() {
                 >
                   {workflow.accept ? "✓ HANDOFF ACCEPTED" : "ACCEPT HANDOFF"}
                 </button>
+
+                <button
+                  type="button"
+                  className={`secondary-button ${
+                    workflow.anchor ? "completed-button" : ""
+                  }`}
+                  onClick={handleAnchor}
+                  disabled={
+                    !workflow.accept || anchorLoading || workflow.anchor
+                  }
+                >
+                  {anchorLoading
+                    ? "ANCHORING..."
+                    : workflow.anchor
+                    ? "✓ HASH ANCHORED"
+                    : "ANCHOR HASH"}
+                </button>
+
+                <button
+                  type="button"
+                  className={`secondary-button ${
+                    workflow.verify
+                      ? "completed-button"
+                      : verifyResult && !verifyResult.verified
+                      ? "failed-button"
+                      : ""
+                  }`}
+                  onClick={handleVerify}
+                  disabled={!workflow.anchor || verifyLoading}
+                >
+                  {verifyLoading
+                    ? "VERIFYING..."
+                    : verifyResult
+                    ? verifyResult.verified
+                      ? "✓ INTEGRITY VERIFIED"
+                      : "✕ INTEGRITY FAILED"
+                    : "VERIFY INTEGRITY"}
+                </button>
+
+                {workflow.anchor && (
+                  <button
+                    type="button"
+                    className="tamper-button"
+                    onClick={handleTamper}
+                    disabled={tamperLoading}
+                  >
+                    {tamperLoading
+                      ? "SIMULATING TAMPER..."
+                      : tamperResult
+                      ? "✓ TAMPER SIMULATED"
+                      : "SIMULATE TAMPER"}
+                  </button>
+                )}
               </div>
             )}
 
@@ -348,7 +565,9 @@ function App() {
           <aside className="receipt-card">
             <div className="receipt-header">
               <div>
-                <div className="receipt-title">Cryptographic Receipt</div>
+                <div className="receipt-title">
+                  Cryptographic Receipt
+                </div>
 
                 <div className="receipt-subtitle">
                   SHA-256 integrity proof
@@ -356,7 +575,17 @@ function App() {
               </div>
 
               <div className="receipt-status">
-                {receipt ? "✓ RECEIPT CREATED" : "AWAITING HANDOFF"}
+                {verifyResult
+                  ? verifyResult.verified
+                    ? "✓ INTEGRITY VERIFIED"
+                    : "✕ INTEGRITY FAILED"
+                  : tamperResult
+                  ? "⚠ TAMPER SIMULATED"
+                  : anchorResult
+                  ? "✓ HASH ANCHORED"
+                  : receipt
+                  ? "✓ RECEIPT CREATED"
+                  : "AWAITING HANDOFF"}
               </div>
             </div>
 
@@ -434,6 +663,75 @@ function App() {
 
                       <p>
                         The incoming analyst has accepted the handoff.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {anchorResult && (
+                  <div className="accepted-note">
+                    <div className="storage-icon">⛓</div>
+
+                    <div>
+                      <strong>Blockchain anchor confirmed</strong>
+
+                      <p>
+                        Block #{anchorResult.block_number}
+                      </p>
+
+                      <p>
+                        Transaction: {anchorResult.transaction_hash}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {tamperResult && (
+                  <div className="tamper-note">
+                    <div className="storage-icon">⚠</div>
+
+                    <div>
+                      <strong>Demo tamper applied</strong>
+
+                      <p>
+                        Severity changed from{" "}
+                        <strong>{tamperResult.original_value}</strong> to{" "}
+                        <strong>{tamperResult.tampered_value}</strong>.
+                      </p>
+
+                      <p>
+                        The blockchain proof remains unchanged.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {verifyResult && (
+                  <div
+                    className={
+                      verifyResult.verified
+                        ? "accepted-note"
+                        : "error-message"
+                    }
+                  >
+                    <div className="storage-icon">
+                      {verifyResult.verified ? "✓" : "✕"}
+                    </div>
+
+                    <div>
+                      <strong>{verifyResult.status}</strong>
+
+                      <p>
+                        The current handoff hash was recalculated and
+                        compared with the blockchain-anchored hash.
+                      </p>
+
+                      <p>
+                        Current Hash: {verifyResult.current_hash}
+                      </p>
+
+                      <p>
+                        Blockchain Hash: {verifyResult.blockchain_hash}
                       </p>
                     </div>
                   </div>

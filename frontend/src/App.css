@@ -172,6 +172,10 @@ button {
   padding: 6px 7px;
 
   opacity: 0.45;
+
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .workflow-step.active {
@@ -259,6 +263,10 @@ button {
   background: #0d131a;
 
   overflow: hidden;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .form-card {
@@ -381,7 +389,8 @@ button {
 
   transition:
     border-color 0.15s ease,
-    background 0.15s ease;
+    background 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .field input,
@@ -413,6 +422,8 @@ button {
 .field textarea:focus {
   border-color: #47718d;
   background: #0c141c;
+
+  box-shadow: 0 0 0 2px rgba(71, 113, 141, 0.08);
 }
 
 .field select {
@@ -444,12 +455,17 @@ button {
 
   transition:
     background 0.15s ease,
-    border-color 0.15s ease;
+    border-color 0.15s ease,
+    transform 0.1s ease;
 }
 
 .primary-button:hover:not(:disabled) {
   background: #204052;
   border-color: #5483a1;
+}
+
+.primary-button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .primary-button:disabled {
@@ -500,12 +516,17 @@ button {
 
   transition:
     background 0.15s ease,
-    border-color 0.15s ease;
+    border-color 0.15s ease,
+    transform 0.1s ease;
 }
 
 .secondary-button:hover:not(:disabled) {
   background: #17232d;
   border-color: #4a6274;
+}
+
+.secondary-button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .secondary-button:disabled {
@@ -517,6 +538,57 @@ button {
   border-color: #37634d;
   background: #102019;
   color: #7fdda4;
+}
+
+/* =========================================================
+   ANCHOR BUTTON
+   ========================================================= */
+
+.anchor-button {
+  border-color: #315c72;
+  background: #0d202b;
+  color: #8fd0ee;
+}
+
+.anchor-button:hover:not(:disabled) {
+  border-color: #4b839f;
+  background: #112b38;
+}
+
+/* =========================================================
+   VERIFY BUTTON
+   ========================================================= */
+
+.verify-button {
+  border-color: #41604e;
+  background: #101d17;
+  color: #9bd9b2;
+}
+
+.verify-button:hover:not(:disabled) {
+  border-color: #5b8a6c;
+  background: #14271d;
+}
+
+/* =========================================================
+   TAMPER BUTTON
+   ========================================================= */
+
+.tamper-button {
+  border-color: #68403f;
+  background: #211517;
+  color: #e4a3a0;
+}
+
+.tamper-button:hover:not(:disabled) {
+  border-color: #955754;
+  background: #2b191b;
+}
+
+.failed-button {
+  border-color: #7d3939;
+  background: #241416;
+  color: #f09b9b;
 }
 
 /* =========================================================
@@ -574,7 +646,7 @@ button {
 .receipt-status {
   flex-shrink: 0;
 
-  max-width: 150px;
+  max-width: 170px;
 
   padding: 7px 9px;
 
@@ -589,6 +661,23 @@ button {
   letter-spacing: 0.6px;
 
   text-align: center;
+}
+
+/* =========================================================
+   TAMPER / FAILED RECEIPT STATES
+   ========================================================= */
+
+.receipt-status.tampered,
+.receipt-status.failed {
+  border-color: #7d3939;
+  background: #241416;
+  color: #f09b9b;
+}
+
+.receipt-card:has(.tamper-button) {
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 /* =========================================================
@@ -722,6 +811,146 @@ button {
 
   overflow-wrap: anywhere;
   word-break: break-all;
+}
+
+/* =========================================================
+   VERIFICATION RESULTS
+   ========================================================= */
+
+.verify-result {
+  width: 100%;
+
+  margin-top: 16px;
+  padding: 14px;
+
+  border: 1px solid #315c47;
+  border-radius: 5px;
+
+  background: #0d1b14;
+}
+
+.verify-result.failed,
+.integrity-failed {
+  border-color: #7d3939;
+  background: #241416;
+}
+
+.verify-result-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+
+  color: #8ce0aa;
+}
+
+.verify-result.failed .verify-result-title,
+.integrity-failed .verify-result-title {
+  color: #f09b9b;
+}
+
+.verify-result-text {
+  margin-top: 6px;
+
+  font-size: 11px;
+  line-height: 1.5;
+
+  color: #84939f;
+}
+
+.verify-hash {
+  margin-top: 12px;
+}
+
+.verify-hash-label {
+  margin-bottom: 5px;
+
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+
+  color: #74828f;
+}
+
+.verify-hash-value {
+  font-family:
+    "SFMono-Regular",
+    Consolas,
+    "Liberation Mono",
+    monospace;
+
+  font-size: 9px;
+  line-height: 1.55;
+
+  color: #a7cfe4;
+
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+/* =========================================================
+   TAMPER RESULT
+   ========================================================= */
+
+.tamper-result {
+  width: 100%;
+
+  margin-top: 16px;
+  padding: 14px;
+
+  border: 1px solid #7d3939;
+  border-radius: 5px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(125, 57, 57, 0.13),
+      rgba(36, 20, 22, 0.9)
+    );
+}
+
+.tamper-result-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+
+  color: #f09b9b;
+}
+
+.tamper-result-text {
+  margin-top: 7px;
+
+  font-size: 11px;
+  line-height: 1.5;
+
+  color: #c08b8b;
+}
+
+.tamper-change {
+  display: inline-flex;
+  align-items: center;
+
+  margin-top: 10px;
+  padding: 6px 8px;
+
+  border: 1px solid #6e3838;
+  border-radius: 4px;
+
+  background: #1d1113;
+
+  font-family:
+    "SFMono-Regular",
+    Consolas,
+    "Liberation Mono",
+    monospace;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  color: #f0aaaa;
 }
 
 /* =========================================================
