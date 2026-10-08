@@ -625,6 +625,10 @@ function App() {
                   <div className="hash-value">
                     {receipt.receipt_hash}
                   </div>
+
+                  <div className="hash-explanation">
+                    Cryptographic fingerprint of the complete handoff state.
+                  </div>
                 </div>
 
                 <div className="storage-note">
@@ -634,7 +638,8 @@ function App() {
                     <strong>Incident data stored OFF-CHAIN</strong>
 
                     <p>
-                      Only the cryptographic proof will be anchored on
+                      Sensitive SOC handoff data remains in the application
+                      database. Only its cryptographic proof is anchored on
                       blockchain.
                     </p>
                   </div>
@@ -669,19 +674,50 @@ function App() {
                 )}
 
                 {anchorResult && (
-                  <div className="accepted-note">
-                    <div className="storage-icon">⛓</div>
+                  <div className="blockchain-proof">
+                    <div className="blockchain-proof-header">
+                      <div className="storage-icon">⛓</div>
 
-                    <div>
-                      <strong>Blockchain anchor confirmed</strong>
+                      <div>
+                        <strong>Blockchain Proof Anchored</strong>
 
-                      <p>
-                        Block #{anchorResult.block_number}
-                      </p>
+                        <p>
+                          The SHA-256 receipt has been recorded on the
+                          blockchain.
+                        </p>
+                      </div>
+                    </div>
 
-                      <p>
-                        Transaction: {anchorResult.transaction_hash}
-                      </p>
+                    <div className="proof-grid">
+                      <div className="proof-item">
+                        <span>BLOCK NUMBER</span>
+                        <strong>#{anchorResult.block_number}</strong>
+                      </div>
+
+                      <div className="proof-item">
+                        <span>HANDOFF ID</span>
+                        <strong>#{anchorResult.handoff_id}</strong>
+                      </div>
+                    </div>
+
+                    <div className="proof-field">
+                      <span>BLOCKCHAIN HASH</span>
+                      <code>{anchorResult.blockchain_hash}</code>
+                    </div>
+
+                    <div className="proof-field">
+                      <span>TRANSACTION HASH</span>
+                      <code>{anchorResult.transaction_hash}</code>
+                    </div>
+
+                    <div className="proof-field">
+                      <span>CONTRACT ADDRESS</span>
+                      <code>{anchorResult.contract_address}</code>
+                    </div>
+
+                    <div className="proof-field">
+                      <span>ANCHORED AT</span>
+                      <code>{anchorResult.anchored_at}</code>
                     </div>
                   </div>
                 )}
@@ -726,13 +762,27 @@ function App() {
                         compared with the blockchain-anchored hash.
                       </p>
 
-                      <p>
-                        Current Hash: {verifyResult.current_hash}
-                      </p>
+                      <div className="verification-comparison">
+                        <div>
+                          <span>CURRENT HASH</span>
+                          <code>{verifyResult.current_hash}</code>
+                        </div>
 
-                      <p>
-                        Blockchain Hash: {verifyResult.blockchain_hash}
-                      </p>
+                        <div>
+                          <span>BLOCKCHAIN HASH</span>
+                          <code>{verifyResult.blockchain_hash}</code>
+                        </div>
+                      </div>
+
+                      <div className="verification-source">
+                        Blockchain transaction:{" "}
+                        <code>{verifyResult.blockchain_transaction}</code>
+                      </div>
+
+                      <div className="verification-source">
+                        Blockchain block:{" "}
+                        <strong>#{verifyResult.block_number}</strong>
+                      </div>
                     </div>
                   </div>
                 )}
