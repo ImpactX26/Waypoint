@@ -14,23 +14,19 @@ function App() {
   });
 
   const [receipt, setReceipt] = useState(null);
-  const [riskResult, setRiskResult] = useState(null);
   const [anchorResult, setAnchorResult] = useState(null);
   const [verifyResult, setVerifyResult] = useState(null);
   const [tamperResult, setTamperResult] = useState(null);
 
   const [error, setError] = useState("");
-  const [riskError, setRiskError] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [riskLoading, setRiskLoading] = useState(false);
   const [anchorLoading, setAnchorLoading] = useState(false);
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [tamperLoading, setTamperLoading] = useState(false);
 
   const [workflow, setWorkflow] = useState({
     create: true,
-    risk: false,
     sign: false,
     accept: false,
     receipt: false,
@@ -47,75 +43,21 @@ function App() {
     }));
   };
 
-  const assessRisk = async () => {
-    setRiskLoading(true);
-    setRiskError("");
-
-    try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/handoffs/risk",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(formData),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || `Risk assessment returned ${response.status}`
-        );
-      }
-
-      if (!data.success) {
-        throw new Error(
-          data.message || "Unable to assess handoff risk"
-        );
-      }
-
-      setRiskResult(data);
-
-      setWorkflow((previous) => ({
-        ...previous,
-        risk: true,
-      }));
-
-      return data;
-    } catch (err) {
-      console.error(err);
-
-      setRiskError(
-        err.message ||
-          "Unable to assess handoff risk. Make sure the FastAPI backend is running."
-      );
-
-      return null;
-    } finally {
-      setRiskLoading(false);
-    }
-  };
 
   const createHandoff = async (event) => {
     event.preventDefault();
 
     setLoading(true);
     setError("");
-    setRiskError("");
 
     setReceipt(null);
-    setRiskResult(null);
     setAnchorResult(null);
     setVerifyResult(null);
     setTamperResult(null);
 
     setWorkflow({
       create: true,
-      risk: false,
-      sign: false,
+        sign: false,
       accept: false,
       receipt: false,
       anchor: false,
@@ -142,11 +84,8 @@ function App() {
       setWorkflow((previous) => ({
         ...previous,
         create: true,
-        receipt: true,
       }));
 
-      // Run ML risk assessment using the same handoff data.
-      await assessRisk();
     } catch (err) {
       console.error(err);
 
@@ -177,6 +116,7 @@ function App() {
     setWorkflow((previous) => ({
       ...previous,
       accept: true,
+      receipt: true,
     }));
   };
 
@@ -330,38 +270,32 @@ function App() {
       description: "Create handoff",
     },
     {
-      key: "risk",
-      number: "02",
-      label: "RISK",
-      description: "ML assessment",
-    },
-    {
       key: "sign",
-      number: "03",
+      number: "02",
       label: "SIGN",
       description: "Outgoing analyst",
     },
     {
       key: "accept",
-      number: "04",
+      number: "03",
       label: "ACCEPT",
       description: "Incoming analyst",
     },
     {
       key: "receipt",
-      number: "05",
+      number: "04",
       label: "RECEIPT",
       description: "SHA-256 proof",
     },
     {
       key: "anchor",
-      number: "06",
+      number: "05",
       label: "ANCHOR",
       description: "Blockchain",
     },
     {
       key: "verify",
-      number: "07",
+      number: "06",
       label: "VERIFY",
       description: "Integrity check",
     },
@@ -697,111 +631,6 @@ function App() {
                   <span>Created At</span>
                   <strong>{receipt.created_at}</strong>
                 </div>
-
-                {/* ML RISK ASSESSMENT */}
-                {riskResult && (
-                  <div className="risk-card">
-                    <div className="risk-header">
-                      <div>
-                        <div className="risk-title">
-                          ML Handoff Risk Assessment
-                        </div>
-
-                        <div className="risk-subtitle">
-                          Random Forest prioritization
-                        </div>
-                      </div>
-
-                      <div
-                        className={`risk-level risk-${riskResult.risk.risk_level.toLowerCase()}`}
-                      >
-                        {riskResult.risk.risk_level}
-                      </div>
-                    </div>
-
-                    <div className="risk-score-row">
-                      <div className="risk-score">
-                        {riskResult.risk.risk_score}
-                      </div>
-
-                      <div className="risk-score-label">
-                        <span>RISK SCORE</span>
-                        <strong>/ 100</strong>
-                      </div>
-                    </div>
-
-                    <div className="risk-meter">
-                      <div
-                        className="risk-meter-fill"
-                        style={{
-                          width: `${Math.min(
-                            100,
-                            Math.max(
-                              0,
-                              riskResult.risk.risk_score
-                            )
-                          )}%`,
-                        }}
-                      ></div>
-                    </div>
-
-                    <div className="risk-reasons">
-                      <div className="risk-reasons-title">
-                        Assessment Factors
-                      </div>
-
-                      {riskResult.risk.reasons.map(
-                        (reason, index) => (
-                          <div
-                            className="risk-reason"
-                            key={index}
-                          >
-                            <span>•</span>
-                            <span>{reason}</span>
-                          </div>
-                        )
-                      )}
-                    </div>
-
-                    <div className="risk-model">
-                      Model:{" "}
-                      <strong>
-                        {riskResult.risk.model}
-                      </strong>
-                    </div>
-                  </div>
-                )}
-
-                {riskError && (
-                  <div className="risk-error">
-                    <strong>Risk assessment unavailable</strong>
-                    <p>{riskError}</p>
-
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={assessRisk}
-                      disabled={riskLoading}
-                    >
-                      {riskLoading
-                        ? "ASSESSING..."
-                        : "RETRY RISK ASSESSMENT"}
-                    </button>
-                  </div>
-                )}
-
-                {riskLoading && !riskResult && (
-                  <div className="risk-loading">
-                    <div className="risk-loading-title">
-                      ML Risk Assessment
-                    </div>
-
-                    <div>
-                      Random Forest is evaluating the
-                      handoff...
-                    </div>
-                  </div>
-                )}
 
                 <div className="hash-section">
                   <div className="hash-label">

@@ -85,5 +85,5 @@ Write-Host "Frontend:  http://localhost:5173" -ForegroundColor Green
 Write-Host "Backend:   http://127.0.0.1:8000" -ForegroundColor Green
 Write-Host "Blockchain: http://127.0.0.1:8545" -ForegroundColor Green
 Write-Host ""
-Write-Host "CREATE -> SIGN -> ACCEPT -> ANCHOR -> VERIFY" -ForegroundColor Cyan
+Write-Host "CREATE -> SIGN -> ACCEPT -> RECEIPT -> ANCHOR -> VERIFY" -ForegroundColor Cyan
 Write-Host ""

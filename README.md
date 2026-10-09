@@ -1,5 +1,6 @@
 # HandOffChain
 
+<<<<<<< HEAD
 **Blockchain-Backed Incident Handoff and Integrity Verification**
 
 HandOffChain is an incident handoff system designed to maintain the integrity and traceability of operational handoff records. It combines a web interface, a Python backend, an SQLite database, cryptographic hashing, and a Solidity smart contract to create, transfer, anchor, and verify handoff records.
@@ -140,10 +141,59 @@ pip install -r requirements.txt
 If the project does not contain `requirements.txt`, install dependencies according to the imports in `main.py` rather than assuming the file exists.
 
 ### 3. Install blockchain dependencies
+=======
+**Blockchain-backed incident handoff and integrity verification.**
+
+HandOffChain records operational handoffs off-chain and anchors a SHA-256 receipt hash on a local Ethereum-compatible blockchain. It uses React/Vite, FastAPI, SQLite, Solidity, Hardhat, Web3.py, and SHA-256. Machine learning and risk prediction are not part of this version.
+
+## Six-stage workflow
+
+1. **CREATE** — enter and save an incident handoff in SQLite.
+2. **SIGN** — the outgoing analyst signs off in the application workflow.
+3. **ACCEPT** — the receiving analyst accepts responsibility.
+4. **RECEIPT** — create/show the SHA-256 integrity receipt for the handoff.
+5. **ANCHOR** — record the receipt hash through the `HandoffRegistry` smart contract.
+6. **VERIFY** — recalculate the current record hash and compare it with the anchored blockchain hash.
+
+The optional tamper demonstration changes a record after anchoring so the verification result can be checked. The full incident data stays in SQLite; the blockchain stores an integrity reference.
+
+## Structure
+
+```text
+HandOffChain/
+├── abi/HandoffRegistry.json
+├── blockchain/
+│   ├── contracts/HandoffRegistry.sol
+│   ├── scripts/deploy.ts
+│   ├── hardhat.config.ts
+│   └── package.json
+├── frontend/
+├── main.py
+└── start-demo.ps1
+```
+
+## Requirements
+
+- Python 3 and a virtual environment
+- Node.js and npm
+- Backend packages: `fastapi`, `uvicorn`, `pydantic`, `sqlalchemy`, `web3`, `eth-account`
+
+## Install
+
+From the project root in PowerShell, activate the existing environment and install backend packages if needed:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+pip install fastapi uvicorn pydantic sqlalchemy web3 eth-account
+```
+
+Install and compile the blockchain package from its own directory:
+>>>>>>> 473fb82 (Update HandOffChain to six-stage workflow without ML)
 
 ```powershell
 cd .\blockchain
 npm install
+<<<<<<< HEAD
 ```
 
 Compile the smart contract:
@@ -153,12 +203,20 @@ npx hardhat compile
 ```
 
 ### 4. Install frontend dependencies
+=======
+npx hardhat clean
+npx hardhat compile
+```
+
+Install frontend dependencies from the frontend directory:
+>>>>>>> 473fb82 (Update HandOffChain to six-stage workflow without ML)
 
 ```powershell
 cd ..\frontend
 npm install
 ```
 
+<<<<<<< HEAD
 ## Running the Application
 
 The project includes `start-demo.ps1`, which is intended to launch the local blockchain, deploy the contract, start the backend, and start the frontend.
@@ -201,3 +259,26 @@ SHA-256 provides an integrity comparison, not confidentiality. Blockchain anchor
 ## Conclusion
 
 HandOffChain provides a workflow for creating and transferring incident handoffs, generating cryptographic receipts, anchoring those receipts on a blockchain, and checking whether records have changed. Its primary focus is **traceability and integrity verification without machine-learning components**.
+=======
+## Run the demo
+
+Return to the project root and run the included startup script:
+
+```powershell
+cd ..
+.\start-demo.ps1
+```
+
+The script opens separate terminal windows for the local Hardhat node, FastAPI, and Vite frontend. Expected URLs are:
+
+- Frontend: `http://localhost:5173`
+- Backend: `http://127.0.0.1:8000`
+- API docs: `http://127.0.0.1:8000/docs`
+- Blockchain RPC: `http://127.0.0.1:8545`
+
+If contract compilation succeeds but deployment fails, check that the Hardhat node is still running and that the ABI in `abi/HandoffRegistry.json` matches the compiled contract. The backend's configured contract address must match the address printed by the deployment script.
+
+## Scope and limitations
+
+This is a local demonstration, not a production deployment. SHA-256 enables integrity comparison but does not provide confidentiality or prove the original incident facts are truthful. The development account key in the backend is intended only for a disposable local Hardhat chain. Do not use it with real funds or sensitive incident data.
+>>>>>>> 473fb82 (Update HandOffChain to six-stage workflow without ML)
