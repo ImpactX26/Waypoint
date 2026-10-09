@@ -1,644 +1,203 @@
-# HandoffChain
+# HandOffChain
 
-### Tamper-Evident SOC Shift Handoff System
+**Blockchain-Backed Incident Handoff and Integrity Verification**
 
-HandoffChain is a cybersecurity prototype designed to protect the integrity of **Security Operations Center (SOC) shift handoffs**.
+HandOffChain is an incident handoff system designed to maintain the integrity and traceability of operational handoff records. It combines a web interface, a Python backend, an SQLite database, cryptographic hashing, and a Solidity smart contract to create, transfer, anchor, and verify handoff records.
 
-It combines structured incident handoff records, SHA-256 cryptographic hashing, blockchain-based proof anchoring, integrity verification, and a Random Forest-based risk prioritization layer.
+The system does not use machine learning or AI-based risk prediction. Integrity verification is performed using SHA-256 hashing and blockchain records.
 
-The system keeps the actual SOC incident information **off-chain** while anchoring only its cryptographic proof on a local Ethereum-compatible blockchain.
+## Features
 
----
+* Create incident handoff records.
+* Sign off and accept handoffs through the application workflow.
+* Store handoff information in an SQLite database.
+* Generate SHA-256 integrity receipts from handoff data.
+* Anchor receipt hashes on a local Ethereum-compatible blockchain.
+* Verify handoff integrity by comparing the current record with its anchored receipt.
+* Demonstrate tampering by modifying a record after anchoring and checking whether verification detects the change.
+* View blockchain transaction details and verification results.
 
-## Problem
+## Technology Stack
 
-SOC analysts commonly work in shifts. During a shift transition, incident information must be transferred from an outgoing analyst to an incoming analyst.
+| Component              | Technology      |
+| ---------------------- | --------------- |
+| Frontend               | React, Vite     |
+| Backend                | Python, FastAPI |
+| Database               | SQLite          |
+| Blockchain development | Hardhat 3       |
+| Smart contract         | Solidity        |
+| Blockchain interaction | Web3.py         |
+| Integrity mechanism    | SHA-256         |
+| Local blockchain       | Hardhat Network |
 
-The challenge is not only recording the handoff, but also being able to determine whether the accepted handoff was **modified afterward**.
+## System Workflow
 
-If a handoff record is changed after its original receipt was created, a conventional application or database may not provide an independent reference that proves what the original record contained.
+The application follows six primary steps.
 
----
+### 1. CREATE — Create the handoff
 
-## Proposed Solution
+The user enters the incident and handoff details, such as severity, affected host, findings, assessment, and pending actions. The backend stores the record in SQLite and assigns it an incident identifier.
 
-HandoffChain creates a cryptographic fingerprint of each SOC handoff using **SHA-256**.
+### 2. SIGN — Sign off the handoff
 
-The system:
+The handoff proceeds through the sign-off stage in the application workflow, indicating that the outgoing party has reviewed the information.
 
-1. Creates a structured SOC handoff.
-2. Assesses its risk using a Random Forest prototype.
-3. Completes the handoff workflow.
-4. Generates a SHA-256 receipt hash.
-5. Stores the actual handoff data off-chain.
-6. Anchors the receipt hash on blockchain.
-7. Recalculates the hash during verification.
-8. Compares the current hash with the blockchain-anchored hash.
-9. Detects modification when the hashes no longer match.
+### 3. ACCEPT — Accept the handoff
 
-### Core principle
+The receiving party accepts the handoff. This represents the transfer of responsibility and provides a clear workflow stage for tracking the incident.
 
-**Incident Data → OFF-CHAIN**
+### 4. RECEIPT — Generate the integrity receipt
 
-**Cryptographic Proof → ON-CHAIN**
+The system generates a SHA-256 hash from a canonical representation of the handoff data. This receipt acts as a fingerprint of the record at the time of generation.
 
----
+### 5. ANCHOR — Record the receipt on the blockchain
 
-## Workflow
+The backend submits the receipt hash to the deployed HandoffRegistry smart contract on the local blockchain. The transaction hash and blockchain receipt information can be used to trace the anchoring operation.
 
-<p align="center">
+The complete handoff record remains in SQLite; the blockchain is used to record the integrity reference rather than the full incident data.
 
-<strong>CREATE</strong>
-→ <strong>RISK</strong>
-→ <strong>SIGN</strong>
-→ <strong>ACCEPT</strong>
-→ <strong>RECEIPT</strong>
-→ <strong>ANCHOR</strong>
-→ <strong>VERIFY</strong>
+### 6. VERIFY — Verify integrity
 
-</p>
+The system retrieves the anchored receipt and recalculates the hash of the current handoff data. It compares the calculated hash with the recorded blockchain hash.
 
-After verification, the system can perform a controlled tamper demonstration:
+* **Verification passes:** the current record matches the anchored integrity reference.
+* **Verification fails:** the current record differs from the anchored version, or the expected blockchain reference cannot be verified.
 
-<p align="center">
-
-<strong>VERIFY ✓</strong>
-→ <strong>TAMPER</strong>
-→ <strong>VERIFY ✗</strong>
-
-</p>
-
----
-
-## How It Works
-
-### 1. Create Handoff
-
-The outgoing SOC analyst enters structured incident information such as:
-
-* Incident ID
-* Severity
-* Alert
-* Affected host
-* Status
-* Findings
-* Assessment
-* Pending actions
-
-The complete handoff is stored in the SQLite database.
-
-### 2. Risk Assessment
-
-The handoff is evaluated using a **Random Forest** prototype.
-
-The current prototype considers incident characteristics such as severity, activity status, and pending actions to produce:
-
-* Risk score
-* Risk level
-* Risk reasons
-
-The ML component is intended for **handoff risk prioritization**.
-
-It is not responsible for detecting blockchain tampering.
-
-### 3. Receipt Generation
-
-A canonical representation of the handoff is created and processed using SHA-256.
-
-The resulting hash acts as a unique cryptographic fingerprint of the handoff.
-
-Even a small change to the underlying handoff data results in a different hash.
-
-### 4. Blockchain Anchoring
-
-The SHA-256 receipt hash is sent to the `HandoffRegistry` Solidity smart contract.
-
-The blockchain stores:
-
-* Handoff ID
-* Receipt hash
-* Timestamp
-* Address that anchored the proof
-
-The sensitive incident information itself is not stored on-chain.
-
-### 5. Integrity Verification
-
-When verification is requested, HandoffChain:
-
-1. Reads the current handoff from the database.
-2. Recalculates its SHA-256 hash.
-3. Retrieves the original receipt hash from the blockchain.
-4. Compares both hashes.
-
-If they match:
-
-**INTEGRITY VERIFIED**
-
-If they differ:
-
-**INTEGRITY FAILED**
-
----
-
-## Tamper Detection
-
-HandoffChain includes a controlled security demonstration.
-
-For example, an originally anchored handoff may contain:
-
-```text
-Severity: HIGH
-```
-
-The tamper demonstration changes the stored handoff to:
-
-```text
-Severity: LOW
-```
-
-The blockchain proof remains unchanged.
-
-The system then recalculates the current handoff hash.
-
-```text
-Original Hash
-      ↓
-Blockchain Anchor
-      ↓
-Handoff Modified
-      ↓
-New Hash
-      ↓
-Compare
-      ↓
-Hash Mismatch
-      ↓
-INTEGRITY FAILED
-```
-
-This demonstrates that changing the handoff after anchoring produces a different cryptographic fingerprint.
-
-> The tamper operation is intentionally implemented as a controlled demonstration and is not intended to represent normal user functionality.
-
----
-
-## Why SHA-256?
-
-SHA-256 provides a deterministic cryptographic fingerprint of the handoff.
-
-For the same canonical handoff:
-
-```text
-Same Data → Same Hash
-```
-
-After modification:
-
-```text
-Changed Data → Different Hash
-```
-
-Therefore, the hash provides an efficient way to detect whether the handoff content has changed.
-
----
-
-## Why Blockchain?
-
-A normal SHA-256 hash can detect changes, but if both the handoff data and its reference hash are controlled by the same application or database, an attacker with sufficient access could potentially modify both.
-
-HandoffChain uses blockchain as an **independent, tamper-evident reference** for the original receipt hash.
-
-The application can therefore compare the current handoff against a proof that is stored separately from the off-chain incident record.
-
----
-
-## Why Not Store the Incident Data on Blockchain?
-
-SOC incident information can contain sensitive operational details.
-
-Storing the complete incident record on-chain would introduce unnecessary privacy, storage, and cost concerns.
-
-HandoffChain therefore uses a hybrid model:
-
-| Data                 | Storage            |
-| -------------------- | ------------------ |
-| Incident details     | SQLite / off-chain |
-| Findings             | SQLite / off-chain |
-| Assessment           | SQLite / off-chain |
-| Pending actions      | SQLite / off-chain |
-| SHA-256 receipt hash | Blockchain         |
-| Blockchain timestamp | Blockchain         |
-| Anchoring address    | Blockchain         |
-
-This keeps the sensitive information off-chain while preserving an independent integrity reference.
-
----
+A tampering demonstration can modify a record after anchoring and run verification again to illustrate integrity detection.
 
 ## Architecture
 
 ```text
-┌───────────────────────────────┐
-│        React Frontend         │
-│                               │
-│  Create / Risk / Sign /       │
-│  Accept / Anchor / Verify     │
-└───────────────┬───────────────┘
-                │
-                ▼
-┌───────────────────────────────┐
-│       FastAPI Backend         │
-│                               │
-│  Handoff Management           │
-│  SHA-256 Receipt Generation   │
-│  Risk Assessment              │
-│  Verification Logic           │
-│  Web3.py Integration          │
-└───────┬───────────────┬───────┘
-        │               │
-        ▼               ▼
-┌───────────────┐   ┌────────────────────┐
-│ SQLite        │   │ Hardhat Blockchain │
-│               │   │                    │
-│ Full Handoff  │   │ Receipt Hash       │
-│ Data          │   │ Timestamp          │
-└───────────────┘   │ Anchoring Address  │
-                    └─────────┬──────────┘
-                              │
-                              ▼
-                    ┌────────────────────┐
-                    │ HandoffRegistry    │
-                    │ Solidity Contract   │
-                    └────────────────────┘
+React + Vite Frontend
+          |
+          v
+     FastAPI Backend
+       /         \
+      v           v
+ SQLite Database  SHA-256 Receipt
+                       |
+                       v
+               HandoffRegistry
+               Solidity Contract
+                       |
+                       v
+                Hardhat Network
 ```
-
----
-
-## Technology Stack
-
-### Frontend
-
-* React
-* Vite
-* JavaScript
-* CSS
-
-### Backend
-
-* Python
-* FastAPI
-* SQLAlchemy
-* SQLite
-* Web3.py
-
-### Machine Learning
-
-* scikit-learn
-* Random Forest
-
-### Cryptography
-
-* SHA-256
-
-### Blockchain
-
-* Solidity
-* Hardhat
-* Ethereum-compatible local network
-
-### Development
-
-* Visual Studio Code
-* PowerShell
-* Git / GitHub
-
----
-
-## Smart Contract
-
-The project uses a Solidity smart contract named:
-
-```text
-HandoffRegistry
-```
-
-The contract maintains a mapping between a handoff ID and its blockchain proof.
-
-Each anchored proof contains:
-
-```text
-Receipt Hash
-Timestamp
-Anchoring Address
-Existence Status
-```
-
-The primary contract operations are:
-
-```text
-anchorHandoff()
-getHandoff()
-```
-
-The contract prevents the same handoff ID from being anchored more than once.
-
----
-
-## Machine Learning Layer
-
-The ML component provides an additional prioritization layer for SOC handoffs.
-
-The current prototype uses a Random Forest model to produce a risk assessment.
-
-Example response:
-
-```text
-Risk Score: 89 / 100
-Risk Level: HIGH
-
-Reasons:
-- High incident severity
-- Incident is still active
-- Multiple pending actions remain
-```
-
-The ML component is separate from the cryptographic integrity mechanism.
-
-### Important distinction
-
-```text
-Random Forest
-      ↓
-Handoff Risk Prioritization
-
-SHA-256 + Blockchain
-      ↓
-Handoff Integrity Verification
-```
-
-The ML model does **not** determine whether a handoff was tampered with.
-
----
-
-## Security Model
-
-HandoffChain separates the system into two layers:
-
-### Off-Chain Layer
-
-Contains the actual SOC handoff information.
-
-```text
-Incident Data
-     ↓
-SQLite
-```
-
-### Integrity Layer
-
-Contains the cryptographic proof.
-
-```text
-Handoff
-   ↓
-SHA-256
-   ↓
-Receipt Hash
-   ↓
-Blockchain
-```
-
-This separation allows the system to protect the integrity of the handoff without placing the complete incident record on-chain.
-
----
-
-## HandoffChain vs. SIEM
-
-HandoffChain is **not a replacement for a SIEM**.
-
-A SIEM focuses on areas such as:
-
-* Security event collection
-* Log aggregation
-* Monitoring
-* Correlation
-* Alerting
-* Detection
-
-HandoffChain focuses specifically on the **integrity of SOC shift handoff records**.
-
-It can therefore be viewed as an integrity/proof layer around the handoff process rather than a complete security monitoring platform.
-
----
 
 ## Project Structure
 
 ```text
-HandoffChain/
-│
+HandOffChain/
 ├── abi/
-│   └── HandoffRegistry.json
-│
 ├── blockchain/
 │   ├── contracts/
 │   │   └── HandoffRegistry.sol
-│   │
 │   ├── scripts/
-│   │   └── deploy.ts
-│   │
+│   ├── artifacts/
+│   ├── cache/
 │   ├── hardhat.config.ts
-│   ├── package.json
-│   └── package-lock.json
-│
+│   └── package.json
 ├── frontend/
-│   ├── src/
-│   │   ├── App.jsx
-│   │   ├── App.css
-│   │   ├── index.css
-│   │   └── main.jsx
-│   │
-│   ├── package.json
-│   └── package-lock.json
-│
+├── .venv/
+├── handoffchain.db
 ├── main.py
 ├── start-demo.ps1
-├── .gitignore
 └── README.md
 ```
 
----
+## Prerequisites
 
-## Running the Project
+Install the following software:
 
-### Requirements
+* Python 3
+* Node.js and npm
+* Visual Studio Code (recommended)
 
-* Python
-* Node.js
-* npm
-* Git
-* VS Code
+The Python virtual environment and Node.js dependencies must be installed before launching the application.
 
-### Start the complete demo
+## Setup
+
+### 1. Open the project directory
+
+```powershell
+cd C:\Users\Pranav\Desktop\HandOffChain
+```
+
+### 2. Prepare the Python environment
+
+Activate the existing virtual environment:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Install the backend dependencies if a `requirements.txt` file is provided:
+
+```powershell
+pip install -r requirements.txt
+```
+
+If the project does not contain `requirements.txt`, install dependencies according to the imports in `main.py` rather than assuming the file exists.
+
+### 3. Install blockchain dependencies
+
+```powershell
+cd .\blockchain
+npm install
+```
+
+Compile the smart contract:
+
+```powershell
+npx hardhat compile
+```
+
+### 4. Install frontend dependencies
+
+```powershell
+cd ..\frontend
+npm install
+```
+
+## Running the Application
+
+The project includes `start-demo.ps1`, which is intended to launch the local blockchain, deploy the contract, start the backend, and start the frontend.
 
 From the project root:
 
 ```powershell
-cd C:\Users\Pranav\Desktop\HandoffChain
+cd C:\Users\Pranav\Desktop\HandOffChain
 .\start-demo.ps1
 ```
 
-The startup script launches the required local services for the demonstration.
+If the script fails, start each component separately and resolve any compilation or deployment errors before testing the complete workflow.
 
-### Manual startup
+Expected local endpoints, subject to the configuration in the project:
 
-If required, the components can also be started separately:
+* Frontend: `http://localhost:5173`
+* Backend API: `http://127.0.0.1:8000`
+* Backend API documentation: `http://127.0.0.1:8000/docs`
+* Local blockchain RPC: `http://127.0.0.1:8545`
 
-#### Blockchain
+## Demonstration Procedure
 
-```powershell
-cd blockchain
-npx hardhat node
-```
+1. Start the blockchain, backend, and frontend.
+2. Create a new incident handoff.
+3. Complete the sign-off and acceptance stages.
+4. Generate the integrity receipt.
+5. Anchor the receipt hash on the local blockchain.
+6. Verify the handoff and observe the successful result.
+7. Use the tampering demonstration, if enabled, to modify the anchored record.
+8. Verify again and observe whether the integrity check detects the modification.
 
-#### Smart Contract
+## Security and Scope
 
-In another terminal:
+HandOffChain demonstrates record-integrity verification using cryptographic hashing and blockchain anchoring. SQLite stores the application records, while the smart contract stores the associated integrity reference.
 
-```powershell
-cd blockchain
-npx hardhat run scripts/deploy.ts --network localhost
-```
+The demonstration uses a local development blockchain and is not, by itself, a production deployment. The local network, development accounts, and test configuration should not be used with real operational or sensitive incident data.
 
-#### Backend
+SHA-256 provides an integrity comparison, not confidentiality. Blockchain anchoring does not encrypt incident records, prove that the original information was truthful, or automatically authenticate a person's identity. Authentication, authorization, secure key management, and production deployment controls would be required for a real-world system.
 
-From the project root with the Python environment activated:
+## Conclusion
 
-```powershell
-uvicorn main:app --reload
-```
-
-#### Frontend
-
-```powershell
-cd frontend
-npm run dev
-```
-
-The frontend is served through the Vite development server.
-
----
-
-## Demonstration Sequence
-
-The recommended demonstration is:
-
-```text
-1. Create Handoff
-2. Run Risk Assessment
-3. Complete Sign Stage
-4. Complete Accept Stage
-5. Generate SHA-256 Receipt
-6. Anchor Receipt Hash
-7. Verify Integrity
-8. Show INTEGRITY VERIFIED
-9. Simulate Controlled Tamper
-10. Verify Again
-11. Show INTEGRITY FAILED
-```
-
-The most important demonstration is the final comparison:
-
-```text
-Current Hash ≠ Blockchain Hash
-             ↓
-     INTEGRITY FAILED
-```
-
-This provides a visible demonstration of the core security concept.
-
----
-
-## Example Handoff
-
-A demonstration handoff can contain:
-
-```text
-Incident ID:
-INC-2048
-
-Severity:
-HIGH
-
-Alert:
-Suspicious authentication activity detected from an unusual source
-
-Affected Host:
-FIN-SRV-01
-
-Status:
-INVESTIGATING
-```
-
-Additional findings, assessment, and pending actions are included in the structured handoff.
-
----
-
-## Prototype Scope
-
-HandoffChain is a **working prototype** demonstrating the concept of blockchain-backed integrity verification for SOC shift handoffs.
-
-The current implementation uses:
-
-* SQLite for off-chain storage
-* Hardhat for the local blockchain
-* A local blockchain development account for transaction signing
-* SHA-256 for receipt generation
-* Random Forest for prototype risk prioritization
-
-The blockchain used in the demonstration is a **local Ethereum-compatible Hardhat network**, not a public Ethereum deployment.
-
-The current `SIGN` and `ACCEPT` stages represent workflow states in the prototype. They should not be interpreted as independent cryptographic analyst signatures.
-
----
-
-## Security Considerations
-
-HandoffChain demonstrates integrity verification rather than complete SOC security.
-
-The prototype does not attempt to replace:
-
-* SIEM platforms
-* Identity and access management
-* Endpoint detection systems
-* Incident response platforms
-* Production key management
-* Enterprise blockchain infrastructure
-
-Its focus is narrower:
-
-> **Provide an independent, tamper-evident integrity reference for SOC shift handoff records.**
-
----
-
-## Key Takeaway
-
-HandoffChain addresses a specific integrity problem in SOC shift transitions.
-
-Instead of relying only on an application database to preserve the history of an accepted handoff, the system creates a cryptographic fingerprint of the handoff and anchors that fingerprint on blockchain.
-
-The actual incident data remains off-chain, while the blockchain preserves the independent integrity reference.
-
-```text
-SOC Handoff
-     ↓
-SHA-256 Fingerprint
-     ↓
-Blockchain Anchor
-     ↓
-Later Verification
-     ↓
-MATCH    → INTEGRITY VERIFIED
-MISMATCH → INTEGRITY FAILED
-```
-
-**HandoffChain — proving whether an accepted SOC handoff remained unchanged.**
+HandOffChain provides a workflow for creating and transferring incident handoffs, generating cryptographic receipts, anchoring those receipts on a blockchain, and checking whether records have changed. Its primary focus is **traceability and integrity verification without machine-learning components**.
